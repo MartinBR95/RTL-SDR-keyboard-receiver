@@ -4,18 +4,6 @@ import matplotlib.pyplot   			# importa libreria de graficacion matematica
 from tkinter import * 				# importa dependencia de matplotlib.pyplot (funcion desconocida)
 from matplotlib import pyplot as plt
 
-
-####################Seccion no implementada aun################
-def print_graph(X,Y,C="b",EjeX="",EjeY="",Titulo="",subplot="111"):
-	Figura = matplotlib.pyplot.figure() 	# crean la figura que contendra la grafica
-	Grafica = Figura.add_subplot(subplot)   # crea la grafica
-	Grafica.set_xlabel(EjeX)				# etiquetan los ejes
-	Grafica.set_ylabel(EjeY)
-	Grafica.set_title(Titulo)
-	Trazo = Grafica.plot(X,Y,C)				# genera la grafica
-	Figura.show()							# muestra la grafica
-
-
 # Leera el archivo .wav obteniendo dos valores de salida (rate,data): 
 # rate: El valor de muestras por segundo (frecuencia de muestreo).
 # data: Una matriz de n fila y dos columnas con los valores de audio (oido izquierdo y oido derecho).
@@ -25,8 +13,6 @@ Archivo    = input("Archivo(/home/martin/Escritorio/Proyecto .wav): ")
 
 rate, data = scipy.io.wavfile.read("/home/martin/Escritorio/Proyecto/"+Archivo+".wav") 
 								#Se optienen los valores de salida mencionados anteriormente
-
-
 
 # ------------------------------------------------------------------------------------------ ----------------------------
 # inicializa matriz que contendra los valores procesados de los datos del .WAV (Data_t = []_x1M)
@@ -40,11 +26,11 @@ Data_t_x1M  = [0]*len(data)	# Se le da a la matriz la misma extension que data (
 inicio   = 0	# Inicio del bit (1 o 0)
 t_bit    = 0    # Tiempo en el bit (individual)
 Mag_max  = 3000 # Por encima de este valor se considera ruido
-t_bit_min = 0.000250 #Por debajo de este tiempo de estado se considera ruido
-t_entre_letra = 0.03 #tiempo(en segundos) minimo entre dos letras,Tiempo que debe transcurrir luego de un estado para que se considere que el siguiente pertenese a una nueva letra
-t_letra  = 0    # tiempo transcurrido en cero (en busca de tiempos entre letras)
-Archivo_letra_a = open("Archivo_letra_a","w+") #Se abre/crea un archivo que contendra los datos procesados para luego usarlos en la neural network
-
+t_bit_min = 0.000250 #Por debajo de este tiempo de bit se considera ruido
+t_entre_letra = 0.0019 #tiempo(en segundos) minimo entre dos letras,Tiempo que debe transcurrir luego de un bit para que se considere que el siguiente pertenese a una nueva letra
+t_ultimo_bit  = 0    # tiempo transcurrido entre bits (en busca de tiempos entre letras)
+Archivo_letra = open("Archivo_letra_"+Archivo,"w+") #Se abre/crea un archivo que contendra los datos procesados para luego usarlos en la neural network
+Pulso = -1			 #guarda la cantidad de pulsos (para cambio de linea)
 
 data_test = [0]*len(data)
 # ----------------------------------------------------------------------------------------------------------------------
@@ -67,24 +53,37 @@ for i in range(len(data)):	# For en en que se leen todos los tiempos de data
 	if (Data_cp[i] == 0)and(Data_cp[i-1] > 0):	# Detecta los cambios de un valor positivo a cero 
 		t_bit = (i-1)/rate - inicio/rate        # Se pasa de tiempo "discreto" a continuo (se divide entre rate)
 											    # Se resta el inicio de la medida con el final de la misma
+		#ciclo for para grafica
 		for r in range(inicio,i):
 			if t_bit > t_bit_min:               # filtra los tiempos pequeños(ruido)
 				Data_t_x1M[r] = -1000000*t_bit  # Se guardan los valores de los tiempos escalados, para ser posteriormente graficados
 
 		if t_bit > t_bit_min:				    # filtra los tiempos pequeños(ruido)
-			Data_t.append(t_bit)                # Se añade los tiempos de duracion de cada estado sin escalar a Data_t
+			
+			if ((i-t_ultimo_bit)/rate > t_entre_letra):
+				Pulso += 1
+				if Pulso == 2:
+					Archivo_letra.write('\n')
+					Pulso = 0
+					data_test[i] = -100
 
+
+			Data_t.append(t_bit)                # Se añade los tiempos de duracion de cada bit sin escalar a Data_t
+			Archivo_letra.write(str(t_bit))
+			t_ultimo_bit = i
+
+	#SE ESPERA PODER ELIMINAR ESTA SECCION
 	# if Data_t_x1M[i] == 0: #si el dato es cero se aumenta el tiempo en cero
-	# 	t_letra += 1
-	#  	if (t_letra/rate == t_entre_letra): #si ya ha transcurrio el tiempo entre letras
-	#  		Archivo_letra_a.write(str(Data_t) +'\n') #se inicia una nueva letra en el archivo
-	#  		t_letra  = 0 #se reinician los valores para las siguientes letras
+	# 	t_ultimo_bit += 1
+	# 	if (t_ultimo_bit/rate == t_entre_letra): #si ya ha transcurrio el tiempo entre letras
+	#  		Archivo_letra.write(str(Data_t) +'\n') #se inicia una nueva letra en el archivo
+	#  		t_ultimo_bit  = 0 #se reinician los valores para las siguientes letras
 	#  		Data_t = []
 	#  		data_test[i] = -100
 	# else:
-	#  	t_letra  = 0
+	#  	t_ultimo_bit  = 0
 
-Archivo_letra_a.close()
+Archivo_letra.close()
 
 #Grafica de magnitud de los datos (tanto el .wav como los tiempos de duracion de cada bit)
 
@@ -110,7 +109,7 @@ Trazo2 =  Grafica_data.plot(x_points, Data_cp, 'b')	# Genera la grafica (Coloca 
 Trazo3 =  Grafica_data.plot(x_points, data_test, 'r')
 Grafica_data.set_xlabel('Tiempo(s)')				# Etiquetan los ejes
 Grafica_data.set_ylabel('Magnitud')
-Grafica_data.set_title('Magnitud')
+Grafica_data.set_title("Archivo: "+Archivo+".wav")
 Figura.show()										# Muestra la grafica
 
 
