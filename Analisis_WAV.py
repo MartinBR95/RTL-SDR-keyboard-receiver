@@ -1,18 +1,16 @@
-import numpy						# importa libreria de matematicas
+import numpy as np					# importa libreria de matematicas
 import scipy.io.wavfile				# importa libreria de lectura de archivos.wav
 import matplotlib.pyplot   			# importa libreria de graficacion matematica
 from tkinter import * 				# importa dependencia de matplotlib.pyplot (funcion desconocida)
 from matplotlib import pyplot as plt
 
 # Leera el archivo .wav obteniendo dos valores de salida (rate,data): 
-# rate: El valor de muestras por segundo (frecuencia de muestreo).
-# data: Una matriz de n fila y dos columnas con los valores de audio (oido izquierdo y oido derecho).
 
-Archivo    = input("Archivo(/home/martin/Escritorio/Proyecto .wav): ")  
-								#Se le solicita al usiario ingresar el nombre del archivo .wav
-
+#Se le solicita al usiario ingresar el nombre del archivo .wav
+Archivo    = input("Archivo(/home/martin/Escritorio/Proyecto .wav): ")
 rate, data = scipy.io.wavfile.read("/home/martin/Escritorio/Proyecto/"+Archivo+".wav") 
-								#Se optienen los valores de salida mencionados anteriormente
+	# rate: El valor de muestras por segundo (frecuencia de muestreo).
+	# data: Una matriz de n fila y dos columnas con los valores de audio (oido izquierdo y oido derecho).
 
 # ------------------------------------------------------------------------------------------ ----------------------------
 # inicializa matriz que contendra los valores procesados de los datos del .WAV (Data_t = []_x1M)
@@ -20,70 +18,89 @@ rate, data = scipy.io.wavfile.read("/home/martin/Escritorio/Proyecto/"+Archivo+"
 #Vectores (matriz de una fila)
 
 Data_cp = [0]*len(data)		# Copia de datos de entrada (data)
-Data_t = []		     	    # Guarda los tiempos de duracion de los bits en segundos (1 o 0) sin escalar
-Data_t_x1M  = [0]*len(data)	# Se le da a la matriz la misma extension que data (inicialmente llena de ceros) con el fin de graficar
+Duracion_bit = 0.0004	    # Define la duracion esperada de un bit
+P_bit = 0					# Tiempo (en periodos: 1,2,3... etc) las distancias entre cambios de signo
+Signo_last = 0				# Ultimo signo(no cero) registrado (para poder detectar correctamente cambios de signo)
+inicio_bit = 0			    # Momento(Discreto) en que se inicia un bit 
+Letra = 0					# numero de letra que se esta guardando (primera,segunda.etc)
+Datos_decod = [[]]			# Vector en el que se guardaran los datos decodificados
 
-inicio   = 0	# Inicio del bit (1 o 0)
-t_bit    = 0    # Tiempo en el bit (individual)
-Mag_max  = 3000 # Por encima de este valor se considera ruido
-t_bit_min = 0.000250 #Por debajo de este tiempo de bit se considera ruido
-t_entre_letra = 0.0019 #tiempo(en segundos) minimo entre dos letras,Tiempo que debe transcurrir luego de un bit para que se considere que el siguiente pertenese a una nueva letra
-t_ultimo_bit  = 0    # tiempo transcurrido entre bits (en busca de tiempos entre letras)
-Archivo_letra = open("Archivo_letra_"+Archivo,"w+") #Se abre/crea un archivo que contendra los datos procesados para luego usarlos en la neural network
-Pulso = -1			 #guarda la cantidad de pulsos (para cambio de linea)
+#Se abre/crea un archivo que contendra los datos procesados
+Archivo_letra = open("Archivo_letra_"+Archivo,"w+") 
 
-data_test = [0]*len(data)
+#Variables para analisis y graficacion de datos
+D_test  =[0]*len(data)
+D_test2 =[0]*len(data)
+D_test3 =[0]*len(data)
+D_test4 =[0]*len(data)
 # ----------------------------------------------------------------------------------------------------------------------
-# Seccion de procesamiento de datos (deteccion de duracion de bits)
+# Seccion de procesamiento de datos
  
-for i in range(len(data)):	# For en en que se leen todos los tiempos de data
+for i in range(len(data)):	# For en el que se leen todos los valores de data
 
-	Data_cp[i] = data[i][0] # Se copian solo los datos del sonido izquierdo, ya que los del derecho son igual. 
-							# Esto se hace para trabajar con Data_cp y no modificar data 
+	# Se copian los datos eliminando(=0) los menores a 1000(ruido en los cambio de signo)
+	if (data[i][0]>1000)or(data[i][0]<-1000):
+		Data_cp[i] = int(data[i][0])/10000 # Se copian solo los datos del sonido izquierdo, ya que los del derecho son igual. 
+								     	   # Esto se hace para trabajar con Data_cp y no modificar data 
 
-	if  data[i][0] < 0:     # Cambia a cero todos los valores negativos
-		Data_cp[i] = 0		# Se eliminan los negativos, para facilitar el procesamiento
+# -------------------------------------------------------------------------------------------
+	#Aqui se espera filtrar el ruido del los datos en Data_cp
+# -------------------------------------------------------------------------------------------
 
-	if  data[i][0] > Mag_max:     # Cambia a cero todos los valores mayores a 2500 (para eliminar ruido)
-		Data_cp[i] = 0		
+	# Detecta los cambios de un + a un - para Detectar el inicio de una letra
+	if (inicio_bit == 0)and(Signo_last ==1)and(np.sign(Data_cp[i])==-1)and(np.sign(Data_cp[i]) != 0):
+		inicio_bit = i-1 	    # se guarda el momento en que se inicia una letra
+		Letra += 1				# Se cambia de letra
+		Datos_decod.append([])  # Nueva fila para una nueva letra
+		D_test2[i-1] = -1
+		print("Nueva letra en: "+str(i/rate)) #TEST? se muertra los tiempos de inicio de cada letra
 
-	if (Data_cp[i] > 0)and(Data_cp[i-1] == 0):	# Detecta los cambios de cero a un valor positivo
-		inicio = i 								# Tiempo (discreto) en que inicia el bit (inicio de la medicion)
+	# Detecta el tiempo de estabilidad en cero entre letras
+	if (Data_cp[i] == 0)and(Data_cp[i-1] == 0)and(Data_cp[i-2] == 0)and(Data_cp[i-3] == 0)and(Data_cp[i-4] == 0):
+		inicio_bit = 0		# Estado entre letras
+	
+	# Detecta los cambio de signo
+	if (Signo_last != np.sign(Data_cp[i]))and(np.sign(Data_cp[i]) != 0)and(inicio_bit != 0):	# Detecta los cambios de un valor negativo a un valor positivo
+		
+		P_bit = (i-inicio_bit)/(Duracion_bit*rate) #tiempo entr cambio de signo(en relacion al periodo de un bit)
+		D_test[i-1] = -P_bit #TEST
 
-	if (Data_cp[i] == 0)and(Data_cp[i-1] > 0):	# Detecta los cambios de un valor positivo a cero 
-		t_bit = (i-1)/rate - inicio/rate        # Se pasa de tiempo "discreto" a continuo (se divide entre rate)
-											    # Se resta el inicio de la medida con el final de la misma
-		#ciclo for para grafica
-		for r in range(inicio,i):
-			if t_bit > t_bit_min:               # filtra los tiempos pequeños(ruido)
-				Data_t_x1M[r] = -1000000*t_bit  # Se guardan los valores de los tiempos escalados, para ser posteriormente graficados
+		#3 Periodos de bit sin cambio, es un cambio de frame
+		if 3 < P_bit:
+					Datos_decod[Letra].append("SP")
 
-		if t_bit > t_bit_min:				    # filtra los tiempos pequeños(ruido)
-			
-			if ((i-t_ultimo_bit)/rate > t_entre_letra):
-				Pulso += 1
-				if Pulso == 2:
-					Archivo_letra.write('\n')
-					Pulso = 0
-					data_test[i] = -100
+		#En caso de que el cambio de signo se encuentre en el medio del periodo del bit se
+		#asume que es un 1 y se revisa si en el periodo pasado nu hubo cambios(0)
+		if 0.25<(P_bit-int(P_bit))<0.75:
 
+			inicio_bit = i - (Duracion_bit*rate)/2 #Correccion de variaciones en el periodo del bit
 
-			Data_t.append(t_bit)                # Se añade los tiempos de duracion de cada bit sin escalar a Data_t
-			Archivo_letra.write(str(t_bit))
-			t_ultimo_bit = i
+			if  2.5<P_bit<3 : #no hubo cambio en el periodo pasado por lo tanto 01
+				Datos_decod[Letra].append(0)
+				Datos_decod[Letra].append(1)
+				D_test3[i]=1 #TEST
+				D_test3[i-int(Duracion_bit*rate)]=0.5 #TEST
 
-	#SE ESPERA PODER ELIMINAR ESTA SECCION
-	# if Data_t_x1M[i] == 0: #si el dato es cero se aumenta el tiempo en cero
-	# 	t_ultimo_bit += 1
-	# 	if (t_ultimo_bit/rate == t_entre_letra): #si ya ha transcurrio el tiempo entre letras
-	#  		Archivo_letra.write(str(Data_t) +'\n') #se inicia una nueva letra en el archivo
-	#  		t_ultimo_bit  = 0 #se reinician los valores para las siguientes letras
-	#  		Data_t = []
-	#  		data_test[i] = -100
-	# else:
-	#  	t_ultimo_bit  = 0
+			else:
+				Datos_decod[Letra].append(1) #hubo cambio en el periodo de bit pasado entonces 1
+				D_test3[i]=1 #TEST
 
-Archivo_letra.close()
+		else: #el cambio ocurrio entre dos periodos por lo tanto en segundo es cero
+			Datos_decod[Letra].append(0)
+			D_test3[i]=0.5 #TEST
+			inicio_bit = i #Correccion de variaciones en el periodo del bit
+
+	#TEST
+	if ((inicio_bit != 0)and( (i-inicio_bit)%(Duracion_bit*rate) < 1)):
+		D_test4[i] = -1
+	#TEST
+
+	#Actualiza el valor del signo
+	if np.sign(Data_cp[i]) != 0:
+		Signo_last = np.sign(Data_cp[i])
+	
+Archivo_letra.write(str(Datos_decod)) #se escriben los datos en el archivo correspondiente
+Archivo_letra.close() #se cierra el archivo
 
 #Grafica de magnitud de los datos (tanto el .wav como los tiempos de duracion de cada bit)
 
@@ -94,7 +111,6 @@ x_points = list(range(len(data)))		# Crea una indexacion para los datos (recorda
 for i in x_points:						# convierte la indexacion a segundos
 	x_points[i] /= rate					# Esto se lee x_points[i] = x_points[i]/rate
 
-
 # *********************************************************************************************************************
 # Esta seccion comentada pregunta por si se desea graficar los puntos de muestro (meramente de simulacion)
 
@@ -103,16 +119,20 @@ for i in x_points:						# convierte la indexacion a segundos
  #	Trazo = Grafica_data.plot(x_points, Data_t = []_x1M, linestyle='-', marker='.',color='b',)	# genera la grafica
 #else:
 # *********************************************************************************************************************
-
-Trazo  =  Grafica_data.plot(x_points, Data_t_x1M,  'g')	# Genera la grafica (Grafica los datos obtenidos del .wav)
-Trazo2 =  Grafica_data.plot(x_points, Data_cp, 'b')	# Genera la grafica (Coloca los valores medidos graficamente)
-Trazo3 =  Grafica_data.plot(x_points, data_test, 'r')
+#Grafica verde, mide(en periodos: 1,2,3... etc) las distancias entre cambios de signo
+Trazo2 = Grafica_data.plot(x_points, D_test, 'g', linestyle='-', marker='.',color='g')
+#Grafica roja marca cada nueva letra
+Trazo3 = Grafica_data.plot(x_points, D_test2, 'r')
+#Grafica cian marca los 1 como 1 y los ceros como 0.5
+Trazo4 = Grafica_data.plot(x_points, D_test3, 'c')
+#Gafica magenta marca cada ancho de bit 
+Trazo5 = Grafica_data.plot(x_points, D_test4, 'm')
+#Grafica azul datos de entrada
+Trazo =  Grafica_data.plot(x_points, Data_cp, 'b')	# Genera la grafica (Coloca los valores medidos graficamente)
 Grafica_data.set_xlabel('Tiempo(s)')				# Etiquetan los ejes
 Grafica_data.set_ylabel('Magnitud')
 Grafica_data.set_title("Archivo: "+Archivo+".wav")
 Figura.show()										# Muestra la grafica
-
-
 # **************************************************************************************************************************
 #					             	FIN DE EJECUCION
 # **************************************************************************************************************************
