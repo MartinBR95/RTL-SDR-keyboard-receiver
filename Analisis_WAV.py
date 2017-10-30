@@ -22,8 +22,8 @@ Duracion_bit = 0.0004	    # Define la duracion esperada de un bit
 P_bit = 0					# Tiempo (en periodos: 1,2,3... etc) las distancias entre cambios de signo
 Signo_last = 0				# Ultimo signo(no cero) registrado (para poder detectar correctamente cambios de signo)
 inicio_bit = 0			    # Momento(Discreto) en que se inicia un bit 
-Letra = 0					# numero de letra que se esta guardando (primera,segunda.etc)
-Datos_decod = [[]]			# Vector en el que se guardaran los datos decodificados
+Letra = -1					# numero de letra que se esta guardando (primera,segunda.etc)
+Datos_decod = []			# Vector en el que se guardaran los datos decodificados
 
 #Se abre/crea un archivo que contendra los datos procesados
 Archivo_letra = open("Archivo_letra_"+Archivo,"w+") 
@@ -51,7 +51,7 @@ for i in range(len(data)):	# For en el que se leen todos los valores de data
 	if (inicio_bit == 0)and(Signo_last ==1)and(np.sign(Data_cp[i])==-1)and(np.sign(Data_cp[i]) != 0):
 		inicio_bit = i-1 	    # se guarda el momento en que se inicia una letra
 		Letra += 1				# Se cambia de letra
-		Datos_decod.append([])  # Nueva fila para una nueva letra
+		Datos_decod.append("")  # Nueva fila para una nueva letra
 		D_test2[i-1] = -1
 		print("Nueva letra en: "+str(i/rate)) #TEST? se muertra los tiempos de inicio de cada letra
 
@@ -67,7 +67,7 @@ for i in range(len(data)):	# For en el que se leen todos los valores de data
 
 		#3 Periodos de bit sin cambio, es un cambio de frame
 		if 3 < P_bit:
-					Datos_decod[Letra].append("SP")
+					Datos_decod[Letra] += " "
 
 		#En caso de que el cambio de signo se encuentre en el medio del periodo del bit se
 		#asume que es un 1 y se revisa si en el periodo pasado nu hubo cambios(0)
@@ -76,17 +76,17 @@ for i in range(len(data)):	# For en el que se leen todos los valores de data
 			inicio_bit = i - (Duracion_bit*rate)/2 #Correccion de variaciones en el periodo del bit
 
 			if  2.5<P_bit<3 : #no hubo cambio en el periodo pasado por lo tanto 01
-				Datos_decod[Letra].append(0)
-				Datos_decod[Letra].append(1)
+				Datos_decod[Letra] += "0"
+				Datos_decod[Letra] += "1"
 				D_test3[i]=1 #TEST
 				D_test3[i-int(Duracion_bit*rate)]=0.5 #TEST
 
 			else:
-				Datos_decod[Letra].append(1) #hubo cambio en el periodo de bit pasado entonces 1
+				Datos_decod[Letra] += "1" #hubo cambio en el periodo de bit pasado entonces 1
 				D_test3[i]=1 #TEST
 
 		else: #el cambio ocurrio entre dos periodos por lo tanto en segundo es cero
-			Datos_decod[Letra].append(0)
+			Datos_decod[Letra] += "0"
 			D_test3[i]=0.5 #TEST
 			inicio_bit = i #Correccion de variaciones en el periodo del bit
 
