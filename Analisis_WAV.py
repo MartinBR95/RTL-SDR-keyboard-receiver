@@ -182,8 +182,8 @@ for i in range(len(data)):	# For en el que se leen todos los valores de data
 			if  1.5<P_bit<2.5 : #no hubo cambio en el periodo pasado por lo tanto 00
 				Datos_decod[Pulso].append(0)
 				Datos_decod[Pulso].append(0)
-				D_test3[i+int(Duracion_bit*rate/2)]=0.75 #TEST
-				D_test3[i-int(Duracion_bit*rate/2)]=0.75 #TEST
+				D_test3[i+int(Duracion_bit*rate/2)]=0.5 #TEST
+				D_test3[i-int(Duracion_bit*rate/2)]=0.5 #TEST
 				inicio_bit = i #Correccion de variaciones en el periodo del bit
 			
 			else:
