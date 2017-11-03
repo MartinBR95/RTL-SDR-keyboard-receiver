@@ -7,8 +7,8 @@ from matplotlib import pyplot as plt
 # Leera el archivo .wav obteniendo dos valores de salida (rate,data): 
 
 #Se le solicita al usiario ingresar el nombre del archivo .wav
-Archivo    = input("Archivo(/home/martin/Escritorio/Proyecto .wav): ")
-rate, data = scipy.io.wavfile.read("/home/martin/Escritorio/Proyecto/"+Archivo+".wav") 
+Archivo    = input("Archivo(/home/santiago/Escritorio/Proyecto .wav): ")
+rate, data = scipy.io.wavfile.read("/home/santiago/Escritorio/Proyecto/"+Archivo+".wav") 
 	# rate: El valor de muestras por segundo (frecuencia de muestreo).
 	# data: Una matriz de n fila y dos columnas con los valores de audio (oido izquierdo y oido derecho).
 
@@ -39,41 +39,28 @@ D_test4 =[0]*len(data)
 #					             	Filtrado de Ruido
 # **************************************************************************************************************************
 
-
 #------------------------------------------------------------------------------
 #------------------------      VARIABLES DEL FILTRO    ------------------------
 #------------------------------------------------------------------------------
-
-N = [0]*len(data)    	#Variable N a muestrear (SIMULACION)
-
-for i in range(1,len(data)):
-	N[i] = i
-
-s = len(N)    		#Tama�o de matriz (SIMULACION) 
 
 u  = 0.02*np.pi   	#Frecuecia que se desea eliminar (MODIFICAR SOLO EL NUMERO)
 r  = 0.5  	     	#Radio del polo
 wc = 0.04*np.pi 	#Frecuencia a fitrar(MODIFICAR SOLO EL NUMERO)
 
-inicio_t_filtro=0     #inicio del tiempo en cero que esta entre los bits del filtro (valor discreto)
+inicio_t_filtro = 0 #inicio del tiempo en cero que esta entre los bits del filtro (valor discreto)
+
 #------------------------------------------------------------------------------
 #----------------------------       FILTRO     --------------------------------
 #------------------------------------------------------------------------------
 
 #Inicializacion de variables (entradas y salidas pasadas)
 
-x_1 = 0
-x_2 = 0
-x_3 = 0
-y_1 = 0
-y_2 = 0
-y_3 = 0
+x_1,x_2,x_3,y_1,y_2,y_3 = 0,0,0,0,0,0
 
 #Normalizacion
 X1c1 = np.sqrt((1 +        np.cos(u))**2 +       (np.sin(u))**2)
 X1c2 = np.sqrt((1 +   np.cos(u + wc))**2 +  (np.sin(u + wc))**2)
 X1c3 = np.sqrt((1 +   np.cos(u - wc))**2 +  (np.sin(u - wc))**2)
-
 X2p1 = np.sqrt((1 -      r*np.cos(u))**2 +     (r*np.sin(u))**2)
 X2p2 = np.sqrt((1 -  r*np.cos(u + u))**2 + (r*np.sin(u + u))**2)
 X2p3 = np.sqrt((1 -  r*np.cos(u - u))**2 + (r*np.sin(u - u))**2)
@@ -81,10 +68,10 @@ X2p3 = np.sqrt((1 -  r*np.cos(u - u))**2 + (r*np.sin(u - u))**2)
 b0 = 10*(X2p1*X2p2*X2p3)/(X1c1*X1c2*X1c3)
 
 #Salida
-A = 2*np.cos(wc) + 1
-B = 2*np.cos(u)  + 1
+A = 2*np.cos(wc) + 1    #Multiplos de entradas anteriores
+B = 2*np.cos(u)  + 1	#Multiplos de salidas anteriores
 
-for i in range(1,s):
+for i in range(1,len(data)):
 
 	Data_filtro[i] = data[i][0]
 
@@ -114,26 +101,21 @@ for i in range(len(data)):
 	if (Data_mask[i] == 0) and (Data_mask[i-1] == 1): 
 		inicio_t_filtro = i
 
-	if (Data_mask[i] == 1) and (Data_mask[i-1] == 0):
-		if (i-1)-inicio_t_filtro < 0.0012*rate:
-			for n in range(inicio_t_filtro,i):
-				Data_mask[n] = 1
-		inicio_t_filtro=0
-
+	if (Data_mask[i] == 1) and (Data_mask[i-1] == 0)and((i-1)-inicio_t_filtro < 0.0012*rate):
+		for n in range(inicio_t_filtro,i):
+			Data_mask[n] = 1
+		inicio_t_filtro = 0
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Seccion de procesamiento de datos
  
-for i in range(len(data)):	# For en el que se leen todos los valores de data
+for i in range(len(data)):				# For en el que se leen todos los valores de data
 
-	# Se copian los datos eliminando(=0) los menores a 1000(ruido en los cambio de signo)
-	#if (data[i][0]>1000)or(data[i][0]<-1000):
-	#	Data_cp[i] = int(data[i][0])/10000 # Se copian solo los datos del sonido izquierdo, ya que los del derecho son igual. 
-								     	   # Esto se hace para trabajar con Data_cp y no modificar data 
-	if Data_mask[i] == 1:
+	if Data_mask[i] == 1:				#Uso de la mascara para eliminar el ruido
 		Data_cp[i] = data[i][0]/6000
 	else:
 		Data_cp[i] = 0
+
 
 # **************************************************************************************************************************
 #					             	Decodificacion
@@ -203,6 +185,11 @@ for i in range(len(data)):	# For en el que se leen todos los valores de data
 Archivo_letra.write(str(Datos_decod)) #se escriben los datos en el archivo correspondiente
 Archivo_letra.close() #se cierra el archivo
 
+
+# -------------------------------------------------------------------------------------------------------------------------
+#					             	Decodificacion (SIMULACION)
+# --------------------------------------------------------------------------------------------------------------------------
+
 #Grafica de magnitud de los datos (tanto el .wav como los tiempos de duracion de cada bit)
 
 Figura = matplotlib.pyplot.figure() 	# Crean la figura que contendra la grafica
@@ -212,14 +199,7 @@ x_points = list(range(len(data)))		# Crea una indexacion para los datos (recorda
 for i in x_points:						# convierte la indexacion a segundos
 	x_points[i] /= rate					# Esto se lee x_points[i] = x_points[i]/rate
 
-# *********************************************************************************************************************
-# Esta seccion comentada pregunta por si se desea graficar los puntos de muestro (meramente de simulacion)
 
-#select_trazo = input("Mostrar puntos: S/N: ") #seleccion para mostrar puntos
-#if select_trazo == "S" or select_trazo =="s":
- #	Trazo = Grafica_data.plot(x_points, Data_t = []_x1M, linestyle='-', marker='.',color='b',)	# genera la grafica
-#else:
-# *********************************************************************************************************************
 #Grafica verde, mide(en periodos: 1,2,3... etc) las distancias entre cambios de signo
 Trazo2 = Grafica_data.plot(x_points, D_test, 'g', linestyle='-', marker='.',color='g')
 #Grafica roja marca cada nueva letra
@@ -235,12 +215,14 @@ Grafica_data.set_ylabel('Magnitud')
 Grafica_data.set_title("Archivo: "+Archivo+".wav")
 Figura.show()										# Muestra la grafica
 
+# --------------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------------------------------
+
+
+
 # **************************************************************************************************************************
 #					             	Desencriptacion
 # **************************************************************************************************************************
-
-
-
 
 
 # **************************************************************************************************************************
