@@ -7,8 +7,8 @@ from matplotlib import pyplot as plt
 # Leera el archivo .wav obteniendo dos valores de salida (rate,data): 
 
 #Se le solicita al usiario ingresar el nombre del archivo .wav
-Archivo    = input("Archivo(/home/santiago/Escritorio/Proyecto .wav): ")
-rate, data = scipy.io.wavfile.read("/home/santiago/Escritorio/Proyecto/"+Archivo+".wav") 
+Archivo    = input("Archivo(/home/martin/Escritorio/Proyecto .wav): ")
+rate, data = scipy.io.wavfile.read("/home/martin/Escritorio/Proyecto/"+Archivo+".wav") 
 	# rate: El valor de muestras por segundo (frecuencia de muestreo).
 	# data: Una matriz de n fila y dos columnas con los valores de audio (oido izquierdo y oido derecho).
 
@@ -25,6 +25,7 @@ Signo_last = 0				# Ultimo signo(no cero) registrado (para poder detectar correc
 inicio_bit = 0			    # Momento(Discreto) en que se inicia un bit 
 Pulso = -1					# numero de Pulso que se esta guardando (primera,segunda.etc)
 Datos_decod = []			# Vector en el que se guardaran los datos decodificados
+Start = 0 					# Bool denota que ya empezo el frame
 
 #Se abre/crea un archivo que contendra los datos procesados
 Archivo_letra = open("Archivo_letra_"+Archivo,"w+") 
@@ -121,57 +122,67 @@ for i in range(len(data)):				# For en el que se leen todos los valores de data
 #					             	Decodificacion
 # **************************************************************************************************************************
 
-	# Detecta los cambios de un + a un - para Detectar el inicio de una letra
+	# Detecta los cambios de un + a un - para Detectar el inicio de una pulso
 	if (inicio_bit == 0)and(Signo_last == -1)and(np.sign(Data_cp[i]) == 1):
-		inicio_bit = i-1 	    # se guarda el momento en que se inicia una letra
-		Pulso += 1				# Se cambia de letra
-		Datos_decod.append([])  # Nueva fila para una nueva letra
+		inicio_bit = i-1 	    # se guarda el momento en que se inicia una pulso
+		#Pulso += 1				# Se cambia de pulso
+		#Datos_decod.append("")  # Nueva fila para un nuevo pulso
 		D_test2[i-1] = -2
-		print("Pulso#: "+str(Pulso+1)+" en "+str(i/rate)) #TEST? se muertra los tiempos de inicio de cada letra
+		#print("Pulso#: "+str(Pulso+1)+" en "+str(i/rate)) #TEST? se muertra los tiempos de inicio de cada pulso
 
-	# Detecta el tiempo de estabilidad en cero entre letras
+	# Detecta el tiempo de estabilidad en cero entre pulsos
 	if (Data_cp[i] == 0)and(Data_cp[i-1] == 0)and(Data_cp[i-2] == 0)and(Data_cp[i-3] == 0)and(Data_cp[i-4] == 0):
-		inicio_bit = 0		# Estado entre letras
+		inicio_bit = 0		# Estado entre pulsos
 		Signo_last = 0
 	
 	# Detecta los cambio de signo
-	if (Signo_last != np.sign(Data_cp[i]))and(np.sign(Data_cp[i]) != 0)and(inicio_bit != 0):	# Detecta los cambios de un valor negativo a un valor positivo
+	if (Signo_last != np.sign(Data_cp[i]))and(inicio_bit != 0):	# Detecta los cambios de un valor negativo a un valor positivo
 		
 		P_bit = (i-inicio_bit)/(Duracion_bit*rate) #tiempo entr cambio de signo(en relacion al periodo de un bit)
 		D_test[i-1] = -P_bit #TEST
 
 		#3 Periodos de bit sin cambio, es un cambio de frame
-		if 3 < P_bit:
-					Datos_decod[Pulso].append("")
+		if P_bit > 3:
+			
+
+			if Start == 1:	#Se establece condicion para solo guardar los datos del frame
+				Start = 0
+			else:
+				Start = 1
+				Datos_decod.append("")  # Nueva fila para un nuevo pulso
+				Pulso += 1				# Se cambia de pulso
+				print("Pulso#: "+str(Pulso+1)+" en "+str(i/rate)) #TEST? se muertra los tiempos de inicio de cada pulso
 
 		#En caso de que el cambio de signo se encuentre en el medio del periodo del bit se
 		#asume que es un 1 y se revisa si en el periodo pasado nu hubo cambios(0)
 		if 0.25<(P_bit-int(P_bit))<0.75:
 
 			inicio_bit = i - (Duracion_bit*rate)/2 #Correccion de variaciones en el periodo del bit
+			if Start == 1:        #solo se graban los datos del frame
+				if  2.5<P_bit<3 : #no hubo cambio en el periodo pasado por lo tanto 01
+					Datos_decod[Pulso] += "0"
+					Datos_decod[Pulso] += "1"
+					D_test3[i]=1 #TEST
+					D_test3[i-int(Duracion_bit*rate)]=0.5 #TEST
 
-			if  2.5<P_bit<3 : #no hubo cambio en el periodo pasado por lo tanto 01
-				Datos_decod[Pulso].append(0)
-				Datos_decod[Pulso].append(1)
-				D_test3[i]=1 #TEST
-				D_test3[i-int(Duracion_bit*rate)]=0.5 #TEST
-
-			else:
-				Datos_decod[Pulso].append(1) #hubo cambio en el periodo de bit pasado entonces 1
-				D_test3[i]=1 #TEST
+				else:
+					Datos_decod[Pulso] += "1" #hubo cambio en el periodo de bit pasado entonces 1
+					D_test3[i]=1 #TEST
 
 		else: #el cambio ocurrio entre dos periodos por lo tanto el segundo es cero
-			if  1.5<P_bit<2.5 : #no hubo cambio en el periodo pasado por lo tanto 00
-				Datos_decod[Pulso].append(0)
-				Datos_decod[Pulso].append(0)
-				D_test3[i+int(Duracion_bit*rate/2)]=0.5 #TEST
-				D_test3[i-int(Duracion_bit*rate/2)]=0.5 #TEST
-				inicio_bit = i #Correccion de variaciones en el periodo del bit
+			inicio_bit = i #Correccion de variaciones en el periodo del bit
 			
-			else:
-				Datos_decod[Pulso].append(0)
-				D_test3[i+int(Duracion_bit*rate/2)]=0.5 #TEST
-				inicio_bit = i #Correccion de variaciones en el periodo del bit
+			if Start == 1:        #solo se graban los datos del frame
+				if  1.5<P_bit<2.5 : #no hubo cambio en el periodo pasado por lo tanto 00
+					Datos_decod[Pulso] += "0"
+					Datos_decod[Pulso] += "0"
+					D_test3[i+int(Duracion_bit*rate/2)]=0.5 #TEST
+					D_test3[i-int(Duracion_bit*rate/2)]=0.5 #TEST
+
+				else:
+					Datos_decod[Pulso] += "0"
+					D_test3[i+int(Duracion_bit*rate/2)]=0.5 #TEST
+					
 		
 	#TEST
 	if ((inicio_bit != 0)and( (i-inicio_bit)%(Duracion_bit*rate) < 1)):
@@ -202,7 +213,7 @@ for i in x_points:						# convierte la indexacion a segundos
 
 #Grafica verde, mide(en periodos: 1,2,3... etc) las distancias entre cambios de signo
 Trazo2 = Grafica_data.plot(x_points, D_test, 'g', linestyle='-', marker='.',color='g')
-#Grafica roja marca cada nueva letra
+#Grafica roja marca cada nuevo pulso
 Trazo3 = Grafica_data.plot(x_points, D_test2, 'r')
 #Grafica cian marca los 1 como 1 y los ceros como 0.5
 Trazo4 = Grafica_data.plot(x_points, D_test3, 'c')
