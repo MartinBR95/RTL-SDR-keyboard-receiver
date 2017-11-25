@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 # Leera el archivo .wav obteniendo dos valores de salida (rate,data): 
 
 #Se le solicita al usiario ingresar el nombre del archivo .wav
-Archivo    = input("Archivo(/home/martin/Escritorio/Proyecto .wav): ")
+Archivo    = input("Archivo(/home/martin/Escritorio/Proyecto  .wav): ")
 rate, data = scipy.io.wavfile.read("/home/martin/Escritorio/Proyecto/"+Archivo+".wav") 
 	# rate: El valor de muestras por segundo (frecuencia de muestreo).
 	# data: Una matriz de n fila y dos columnas con los valores de audio (oido izquierdo y oido derecho).
@@ -36,12 +36,18 @@ D_test2 =[0]*len(data)
 D_test3 =[0]*len(data)
 D_test4 =[0]*len(data)
 
+
+#Variables Traduccion binario-ASCII
+Letras=[]
+Archivo_Letras=open("Archivo_Letras", "w+")
+diccionario={"000000010010011110101100000111101001100":"a",'000000010010011110101100000001011011000':"b",'0000000100100111101011000011100110101000':"c",'0000000010010011110101100001111101010000':"d",'0000000100100111101011000010101010101000':"e",'000000010010011110101100011111101101000':"f",'0000000100100111101011000000000111101000':"g",'000000010010011110101100010000011001100':"h",'0000000100100111101011000111101010001000':"i",'000000010010011110101100001000011101000':"j",'000000010010011110101100011000011010000':"k",'000000010010011110101100000100011011100':"l",'0000000100100111101011000010010110001000':"m",'000000010010011110101100010001011100000':"n",'0000000100100111101011000000011011100000':"o",'0000000100100111101011000100011010010000':"p",'0000000100100111101011000000101010010000':"q",'000000010010011110101100011010101101100':"r",'0000000100100111101011000101111011101000':"s",'000000010010011110101100000110101100000':"t",'000000010010011110101100001110101111100':"u",'000000010010011110101100011110011101100':"v",'0000000100100111101011000100101011100000':"w",'000000010010011110101100010110011110000':"x",'000000010010011110101100010110101011000':"y",'000000010010011110101100000110011001000':"z",'0000000100100111101011000011110111110000':" ",'0000000100100111110101100001111101010000':"p",'00000001001000111101011000011110111110000':"d",'000000010010011110101100001111101010000':"d",'00000001001001111011011000100011010010000':"p",'0000000100100111101101100001000011101000':"j"}
+
 # **************************************************************************************************************************
 #					             	Filtrado de Ruido
 # **************************************************************************************************************************
 
 #------------------------------------------------------------------------------
-#------------------------      VARIABLES DEL FILTRO    ------------------------
+#------------------------      VARIABLES DEL FILTRO   000000010010011110101100011000011010000 ------------------------
 #------------------------------------------------------------------------------
 
 u  = 0.02*np.pi   	#Frecuecia que se desea eliminar (MODIFICAR SOLO EL NUMERO)
@@ -106,6 +112,15 @@ for i in range(len(data)):
 		for n in range(inicio_t_filtro,i):
 			Data_mask[n] = 1
 		inicio_t_filtro = 0
+
+for i in range(len(data)):
+	if (Data_mask[i] == 1) and (Data_mask[i-1] == 0): 
+		aux_inicio = i
+
+	if (Data_mask[i] == 0) and (Data_mask[i-1] == 1): 
+		if (i - aux_inicio < 0.012*rate):
+			for n in range(aux_inicio,i):
+				Data_mask[n] = 0
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Seccion de procesamiento de datos
@@ -232,12 +247,35 @@ Figura.show()										# Muestra la grafica
 
 
 # **************************************************************************************************************************
-#					             	Desencriptacion
+#					             	Traduccion binario-ASCII
 # **************************************************************************************************************************
 
+cuenta = 0
+for x in range(len(Datos_decod)-3): 	#Datos en el rango de los datos decodificados
+
+	if x%4 == 0: 				#Busca los datos ubicados en una posicón que sea múltiplo de 4, ya que ahí habrá una nueva letra
+		if str(diccionario.get(Datos_decod[x])) == 'None' and cuenta < 3:
+				cuenta = cuenta + 1
+				
+		Letras.append(Datos_decod[x+cuenta]) #Agrega las letras filtradas a una lista llamada "Letras"
+
+Archivo_Letras.write(str(Letras))
+Archivo_Letras.close()
+
+string_Salida = ''
+
+contador=0 #contador de los índices de la lista
+for buscador in range(len(Letras)):#Datos dentro del rango de los datos decodificados filtrados
+	if (contador < len(Letras)):#se recorre indice por indice de la lista
+		descriptado = Letras[buscador] #según el indice, se selecciona el valor que se ubica en dicho indice de la lista
+		string_Salida = string_Salida + str(diccionario.get(descriptado)) #se compara con alguno de los valores del diccionario
+		contador = contador+1 #se incrementa el valor del contador, para seguir con el siguiente índice
+
+print (string_Salida)	
 
 # **************************************************************************************************************************
 #					             	FIN DE EJECUCION
 # **************************************************************************************************************************
+
 nada=input("Salir: ")
 matplotlib.pyplot.close("all")						# Cierra las figuras abiertas
